@@ -108,6 +108,57 @@ class RTree {
   /// @param point Point of interest
   /// @param radius distance within which neighbors are returned
   /// @return the k nearest neighbors
+  template <
+      int DimensionCount = N,
+      typename std::enable_if<DimensionCount == 2, void>::type * = nullptr>
+  std::vector<result_t> query_ball(
+      const geometry::PointND<Coordinate, N> &point,
+      const double radius) const {
+    auto box = geometry::BoxND<Coordinate, N>(
+        {point.template get<0>() - radius, point.template get<1>() - radius},
+        {point.template get<0>() + radius, point.template get<1>() + radius});
+    auto within = std::vector<value_t>();
+    tree_->query(boost::geometry::index::covered_by(box),
+                 std::back_inserter(within));
+    auto result = std::vector<result_t>();
+    for (auto &&item : within) {
+      auto distance = boost::geometry::distance(point, item.first);
+      if (distance <= radius) {
+        result.emplace_back(std::make_pair(distance, item.second));
+      }
+    }
+    return result;
+  }
+
+  template <
+      int DimensionCount = N,
+      typename std::enable_if<DimensionCount == 3, void>::type * = nullptr>
+  std::vector<result_t> query_ball(
+      const geometry::PointND<Coordinate, N> &point,
+      const double radius) const {
+    auto multi_polygon = RTree::cube(
+        geometry::PointND<Coordinate, N>(point.template get<0>() - radius,
+                                         point.template get<1>() - radius,
+                                         point.template get<2>() - radius),
+        geometry::PointND<Coordinate, N>(point.template get<0>() + radius,
+                                         point.template get<1>() + radius,
+                                         point.template get<2>() + radius));
+    auto within = std::vector<value_t>();
+    tree_->query(boost::geometry::index::covered_by(box),
+                 std::back_inserter(within));
+    auto result = std::vector<result_t>();
+    for (auto &&item : within) {
+      auto distance = boost::geometry::distance(point, item.first);
+      if (distance <= radius) {
+        result.emplace_back(std::make_pair(distance, item.second));
+      }
+    }
+    return result;
+  }
+
+  template <int DimensionCount = N,
+            typename std::enable_if<DimensionCount != 2 && DimensionCount != 3,
+                                    void>::type * = nullptr>
   std::vector<result_t> query_ball(
       const geometry::PointND<Coordinate, N> &point,
       const double radius) const {
@@ -158,6 +209,87 @@ class RTree {
  protected:
   /// Geographic index used to store data and their searches.
   std::shared_ptr<rtree_t> tree_;
+
+ private:
+  /// Polygon used
+  using Polygon =
+      boost::geometry::model::polygon<geometry::PointND<Coordinate, N>>;
+
+  /// Multi-polygon used
+  using MultiPolygon = boost::geometry::model::multi_polygon<Polygon>;
+
+  /// Defines from two points a collection of contiguous 3D polygons that share
+  /// certain edges and describe a cube.
+  static MultiPolygon cube(const geometry::PointND<Coordinate, N> &min_corner,
+                           const geometry::PointND<Coordinate, N> &max_corner) {
+    return MultiPolygon(
+        {// bottom (0 0 0, 0 1 0, 1 1 0, 1 0 0, 0 0 0),
+         Polygon{{{min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()}}},
+         // left (0 0 0, 0 0 1, 0 1 1, 0 1 0, 0 0 0),
+         Polygon{{{min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()}}},
+         // front (0 0 0, 1 0 0, 1 0 1, 0 0 1, 0 0 0),
+         Polygon{{{min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()}}},
+         // top (0 0 1, 1 0 1, 1 1 1, 0 1 1, 0 0 1),
+         Polygon{{{min_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {min_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()}}},
+         // right (1 0 0, 1 1 0, 1 1 1, 1 0 1, 1 0 0),
+         Polygon{{{max_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), min_corner.template get<1>(),
+                   min_corner.template get<2>()}}},
+         // Back (1 1 0, 0 1 0, 0 1 1, 1 1 1, 1 1 0)
+         Polygon{{{max_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()},
+                  {min_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   max_corner.template get<2>()},
+                  {max_corner.template get<0>(), max_corner.template get<1>(),
+                   min_corner.template get<2>()}}}});
+  }
 };
 
 }  // namespace pyinterp::detail::geometry

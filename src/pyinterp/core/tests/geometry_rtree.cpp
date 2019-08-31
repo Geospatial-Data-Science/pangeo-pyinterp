@@ -52,6 +52,9 @@ TEST(geometry_rtree, query) {
   EXPECT_EQ(nearest[1].second, 1);
   EXPECT_EQ(nearest[2].second, 3);
 
+  nearest = rtree.query_ball({0, 0}, 1);
+  ASSERT_EQ(nearest.size(), 0);
+
   nearest = rtree.query_ball({4, 4}, 1);
   ASSERT_EQ(nearest.size(), 1);
   EXPECT_EQ(nearest[0].second, 1);
