@@ -112,21 +112,23 @@ class RTree : public geometry::RTree<Coordinate, Type, 3> {
   std::vector<result_t> query_ball(
       const geometry::EquatorialPoint3D<Coordinate> &point,
       const double radius) const {
-    auto result = std::vector<result_t>();
-    std::for_each(
-        this->tree_->qbegin(
-            boost::geometry::index::satisfies([&](const auto &item) {
-              return boost::geometry::distance(
-                         coordinates_.ecef_to_lla(item.first), point,
-                         strategy_) < radius;
-            })),
-        this->tree_->qend(), [&](const auto &item) {
-          result.emplace_back(std::make_pair(
-              boost::geometry::distance(
-                  point, coordinates_.ecef_to_lla(item.first), strategy_),
-              item.second));
-        });
-    return result;
+    auto ecef = coordinates_.lla_to_ecef(point);
+    return geometry::RTree<Coordinate, Type, 3>::query_ball(ecef, radius);
+    // auto result = std::vector<result_t>();
+    // std::for_each(
+    //     this->tree_->qbegin(
+    //         boost::geometry::index::satisfies([&](const auto &item) {
+    //           return boost::geometry::distance(
+    //                      coordinates_.ecef_to_lla(item.first), point,
+    //                      strategy_) < radius;
+    //         })),
+    //     this->tree_->qend(), [&](const auto &item) {
+    //       result.emplace_back(std::make_pair(
+    //           boost::geometry::distance(
+    //               point, coordinates_.ecef_to_lla(item.first), strategy_),
+    //           item.second));
+    //     });
+    // return result;
   }
 
   /// Search for the K nearest neighbors around a given point.

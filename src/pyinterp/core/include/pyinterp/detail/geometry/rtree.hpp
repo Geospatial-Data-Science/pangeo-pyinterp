@@ -136,7 +136,7 @@ class RTree {
   std::vector<result_t> query_ball(
       const geometry::PointND<Coordinate, N> &point,
       const double radius) const {
-    auto multi_polygon = RTree::cube(
+    auto cube = RTree::cube(
         geometry::PointND<Coordinate, N>(point.template get<0>() - radius,
                                          point.template get<1>() - radius,
                                          point.template get<2>() - radius),
@@ -144,15 +144,15 @@ class RTree {
                                          point.template get<1>() + radius,
                                          point.template get<2>() + radius));
     auto within = std::vector<value_t>();
-    tree_->query(boost::geometry::index::covered_by(box),
+    tree_->query(boost::geometry::index::covered_by(cube),
                  std::back_inserter(within));
     auto result = std::vector<result_t>();
-    for (auto &&item : within) {
-      auto distance = boost::geometry::distance(point, item.first);
-      if (distance <= radius) {
-        result.emplace_back(std::make_pair(distance, item.second));
-      }
-    }
+    // for (auto &&item : within) {
+    //   auto distance = boost::geometry::distance(point, item.first);
+    //   if (distance <= radius) {
+    //     result.emplace_back(std::make_pair(distance, item.second));
+    //   }
+    // }
     return result;
   }
 
